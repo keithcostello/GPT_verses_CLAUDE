@@ -137,6 +137,12 @@ def render_fantasy_tab():
 """)
 
 def main():
+    # Manual refresh button — forces re-fetch of all live data
+    _, right = st.columns([4, 1])
+    with right:
+        if st.button("Refresh Data", type="secondary", use_container_width=True):
+            st.rerun()
+
     # Tab layout
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Fantasy",
