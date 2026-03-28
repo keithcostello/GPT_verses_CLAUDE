@@ -2,27 +2,28 @@ import pytest
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from telemetry_tab import SuzukaTelemetry, TelemetryAnalyzer
+from telemetry_tab import OpenF1Client, TelemetryAnalyzer
 
-class TestSuzukaTelemetry:
-    """Tests for Suzuka telemetry fetcher."""
+class TestOpenF1Client:
+    """Tests for OpenF1 API client."""
 
-    def test_suzuka_session_key_known(self):
-        """Suzuka has a known circuit ID in OpenF1."""
-        t = SuzukaTelemetry()
-        assert t.circuit_name == "Suzuka International Racing Course"
+    def test_fetch_all_sessions_returns_list(self):
+        """Returns a list of sessions (empty on error)."""
+        client = OpenF1Client()
+        result = client.fetch_all_sessions(year=2026)
+        assert isinstance(result, list)
 
-    def test_sector_boundaries_defined(self):
-        """Suzuka has 3 sectors matching F1 standard."""
-        t = SuzukaTelemetry()
-        assert len(t.sector_boundaries) == 3
-        # Turn 1 (heavy braking), 130R (high speed), final sector (technical)
+    def test_fetch_laps_returns_list(self):
+        """Returns lap list for a session key."""
+        client = OpenF1Client()
+        result = client.fetch_laps(session_key="nonexistent")
+        assert isinstance(result, list)
 
-    def test_get_driver_sector_times(self):
-        """Returns sector 1, 2, 3 times for a driver."""
-        t = SuzukaTelemetry()
-        times = t.get_driver_sector_times(driver_number=44)
-        assert 'sector_1' in times or 'sector_2' in times or 'sector_3' in times
+    def test_fetch_positions_returns_list(self):
+        """Returns position list for a session key."""
+        client = OpenF1Client()
+        result = client.fetch_positions(session_key="nonexistent")
+        assert isinstance(result, list)
 
 class TestTelemetryAnalyzer:
     """Tests for telemetry analysis."""
@@ -43,13 +44,13 @@ class TestTelemetryAnalyzer:
     def test_fastest_lap_detection(self):
         """Returns the fastest lap time and driver."""
         laps = [
-            {'driver': 'Russell', 'time': 90000},
-            {'driver': 'Hamilton', 'time': 89500},  # fastest
-            {'driver': 'Leclerc', 'time': 91000},
+            {'driver_number': 44, 'lap_time': 90000},
+            {'driver_number': 63, 'lap_time': 89500},  # fastest
+            {'driver_number': 16, 'lap_time': 91000},
         ]
         a = TelemetryAnalyzer()
         fastest = a.fastest_lap_detection(laps)
-        assert fastest['driver'] == 'Hamilton'
+        assert fastest['driver'] == 63
         assert fastest['time'] == 89500
 
     def test_pit_stop_count_from_stints(self):

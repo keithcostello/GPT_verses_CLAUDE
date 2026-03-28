@@ -14,8 +14,7 @@ import styles  # noqa: F401
 
 # Page config
 st.set_page_config(
-    page_title="F1 F1 Fantasy — Suzuka 2026",
-    page_icon="🏎️",
+    page_title="F1 Fantasy — Suzuka 2026",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -67,7 +66,7 @@ def render_fantasy_tab():
     # Header
     st.markdown("""
     <div style="background:#0d1117; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-        <h1 style="color:#f0f6fc; margin:0;">🏆 F1 Fantasy — Suzuka 2026</h1>
+        <h1 style="color:#f0f6fc; margin:0; font-family:'Inter','DM Sans',sans-serif; font-weight:600;">F1 Fantasy — Suzuka 2026</h1>
         <p style="color:#8b949e; margin:4px 0 0 0;">GP Japan | March 28-29, 2026</p>
     </div>
     """, unsafe_allow_html=True)
@@ -118,7 +117,7 @@ def render_fantasy_tab():
             </div>
             """, unsafe_allow_html=True)
         with col_projs:
-            st.markdown("#### 📊 Projected Rankings")
+            st.markdown("#### Projected Rankings")
             for i, driver in enumerate(predictions[:10]):
                 color = TEAM_COLORS.get(driver.get('team', ''), "#888888")
                 st.markdown(f"**{i+1}. {driver['name']}** ({driver.get('team', '')}) — ${driver['price']/1e6:.1f}M — **{driver['projected_ppm']:.2f} PPM**")
@@ -140,11 +139,11 @@ def render_fantasy_tab():
 def main():
     # Tab layout
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏆 Fantasy",
-        "📡 Telemetry",
-        "🛞 Strategy",
-        "🌦️ Weather",
-        "🎲 Monte Carlo"
+        "Fantasy",
+        "Telemetry",
+        "Strategy",
+        "Weather",
+        "Monte Carlo"
     ])
 
     with tab1:

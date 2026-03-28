@@ -5,40 +5,30 @@ from typing import Dict, List, Optional
 
 BASE_URL = "https://api.openf1.org/v1"
 
-class SuzukaTelemetry:
-    """Suzuka circuit telemetry utilities."""
 
-    def __init__(self):
-        self.circuit_name = "Suzuka International Racing Course"
-        self.circuit_country = "Japan"
-        self.sector_boundaries = {
-            'sector_1': 'Turn 1-7 (Toyota S-Figure, DunlopCurve)',
-            'sector_2': 'Turn 8-12 (250R, Hairpin, Spoon Curve)',
-            'sector_3': 'Turn 13-16 (130R, final chicane)'
-        }
+class OpenF1Client:
+    """OpenF1 API client for F1 telemetry data."""
 
-    def fetch_suzuka_session(self, year=2026) -> Optional[Dict]:
-        """Get the Suzuka session key for a given year."""
+    def fetch_all_sessions(self, year: int = None) -> List[Dict]:
+        """Fetch all sessions, optionally filtered by year."""
+        params = {'limit': 200}
+        if year:
+            params['year'] = year
         try:
-            resp = requests.get(f"{BASE_URL}/sessions", params={
-                'year': year,
-                'country_code': 'JP',
-                'session_name': 'Race'
-            }, timeout=10)
+            resp = requests.get(f"{BASE_URL}/sessions", params=params, timeout=15)
             data = resp.json()
-            if data:
-                return data[0]
+            return data if isinstance(data, list) else []
         except Exception:
-            pass
-        return None
+            return []
 
-    def fetch_lap_times(self, session_key: str) -> List[Dict]:
+    def fetch_laps(self, session_key: str) -> List[Dict]:
         """Fetch all lap times for a session."""
         try:
             resp = requests.get(f"{BASE_URL}/laps", params={
                 'session_key': session_key
             }, timeout=15)
-            return resp.json()
+            data = resp.json()
+            return data if isinstance(data, list) else []
         except Exception:
             return []
 
@@ -48,7 +38,8 @@ class SuzukaTelemetry:
             resp = requests.get(f"{BASE_URL}/position", params={
                 'session_key': session_key
             }, timeout=15)
-            return resp.json()
+            data = resp.json()
+            return data if isinstance(data, list) else []
         except Exception:
             return []
 
@@ -58,7 +49,8 @@ class SuzukaTelemetry:
             resp = requests.get(f"{BASE_URL}/intervals", params={
                 'session_key': session_key
             }, timeout=15)
-            return resp.json()
+            data = resp.json()
+            return data if isinstance(data, list) else []
         except Exception:
             return []
 
@@ -68,22 +60,10 @@ class SuzukaTelemetry:
             resp = requests.get(f"{BASE_URL}/stints", params={
                 'session_key': session_key
             }, timeout=15)
-            return resp.json()
+            data = resp.json()
+            return data if isinstance(data, list) else []
         except Exception:
             return []
-
-    def get_driver_sector_times(self, driver_number: int) -> Dict:
-        """
-        Get sector times for a driver.
-        Note: OpenF1 does not provide sector-level timing;
-        this returns structural sector boundaries for Suzuka.
-        """
-        return {
-            'sector_1': 'Turn 1-7 (Toyota S-Figure, DunlopCurve)',
-            'sector_2': 'Turn 8-12 (250R, Hairpin, Spoon Curve)',
-            'sector_3': 'Turn 13-16 (130R, final chicane)',
-            'driver_number': driver_number
-        }
 
 
 class TelemetryAnalyzer:
@@ -105,11 +85,11 @@ class TelemetryAnalyzer:
         """Return driver + time of fastest lap."""
         if not laps:
             return {'driver': None, 'time': None}
-        valid = [l for l in laps if l.get('time') and l['time'] > 0]
+        valid = [l for l in laps if l.get('lap_time') and l['lap_time'] > 0]
         if not valid:
             return {'driver': None, 'time': None}
-        fastest = min(valid, key=lambda x: x['time'])
-        return {'driver': fastest.get('driver', 'Unknown'), 'time': fastest['time']}
+        fastest = min(valid, key=lambda x: x['lap_time'])
+        return {'driver': fastest.get('driver_number', 'Unknown'), 'time': fastest['lap_time']}
 
     def pit_stop_count_from_stints(self, driver: str, stints: List[Dict]) -> int:
         """2 stints = 1 pit stop, 3 stints = 2 pit stops."""
@@ -135,35 +115,60 @@ class TelemetryAnalyzer:
 
 
 def render_telemetry_tab():
-    """Render the Streamlit telemetry tab."""
+    """Render the Streamlit telemetry tab with session selector."""
     st.markdown("### 📡 Live Telemetry")
 
-    # Session selector
-    col1, col2 = st.columns(2)
-    with col1:
-        year = st.selectbox("Season", [2026, 2025], index=0)
-    with col2:
-        session_type = st.selectbox("Session", ["Race", "Qualifying", "Sprint", "FP1", "FP2", "FP3"])
-
-    telemetry = SuzukaTelemetry()
+    client = OpenF1Client()
     analyzer = TelemetryAnalyzer()
 
-    # Fetch session data
-    session = telemetry.fetch_suzuka_session(year)
+    # Year selector
+    year = st.selectbox("Season", [2026, 2025, 2024, 2023], index=0)
 
-    if not session:
-        st.warning("Suzuka session data not yet available. Check back when FP1 starts.")
-        st.info("OpenF1 data is embargoed until race weekend begins.")
+    # Fetch all sessions for the selected year
+    sessions = client.fetch_all_sessions(year=year)
+
+    if not sessions:
+        st.warning("No sessions found for the selected season. OpenF1 may be unavailable.")
         return
 
-    session_key = session.get('session_key')
-    st.success(f"Session: {session.get('session_name', 'Race')} — {session.get('meeting_name', 'Japanese GP')}")
+    # Group sessions by meeting/country
+    meetings = {}
+    for s in sessions:
+        key = s.get('meeting_name', 'Unknown')
+        if key not in meetings:
+            meetings[key] = s
+
+    # Country selector
+    meeting_names = sorted(meetings.keys())
+    if not meeting_names:
+        st.warning("No Grand Prix found for the selected season.")
+        return
+
+    selected_meeting = st.selectbox("Grand Prix", meeting_names)
+
+    # Session type selector
+    meeting_sessions = [s for s in sessions if s.get('meeting_name') == selected_meeting]
+    session_types = list(set(s.get('session_name', '') for s in meeting_sessions))
+    session_type = st.selectbox("Session", sorted(session_types))
+
+    # Get session key for selected session
+    selected_session = next(
+        (s for s in meeting_sessions if s.get('session_name') == session_type),
+        None
+    )
+
+    if not selected_session:
+        st.warning("Select a session to view telemetry.")
+        return
+
+    session_key = selected_session.get('session_key')
+    st.success(f"Session: {session_type} — {selected_meeting}")
 
     # Fetch all telemetry data
-    laps = telemetry.fetch_lap_times(session_key)
-    positions = telemetry.fetch_positions(session_key)
-    intervals = telemetry.fetch_intervals(session_key)
-    stints = telemetry.fetch_stints(session_key)
+    laps = client.fetch_laps(session_key)
+    positions = client.fetch_positions(session_key)
+    intervals = client.fetch_intervals(session_key)
+    stints = client.fetch_stints(session_key)
 
     # Stint/Tire analysis
     st.markdown("#### 🛞 Tire Strategy")
@@ -185,7 +190,7 @@ def render_telemetry_tab():
     # Lap time table
     st.markdown("#### ⏱️ Lap Times")
     if laps:
-        # Show top 20 laps sorted by time
+        # Show top 10 laps sorted by lap_time
         valid_laps = [l for l in laps if l.get('lap_time') and l['lap_time'] > 0]
         valid_laps.sort(key=lambda x: x['lap_time'])
         for lap in valid_laps[:10]:
@@ -207,21 +212,21 @@ def render_telemetry_tab():
 def render_mock_telemetry():
     """Render mock telemetry when no live data available."""
     st.markdown("### 📡 Live Telemetry")
-    st.info("📡 Live data will appear here when Suzuka sessions begin.")
+    st.info("📡 Select a session above to view live telemetry data.")
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Session", "FP1", label_visibility="collapsed")
+        st.metric("Session", "—", label_visibility="collapsed")
     with col2:
-        st.metric("Status", "Upcoming", label_visibility="collapsed")
+        st.metric("Status", "Awaiting Selection", label_visibility="collapsed")
     with col3:
         st.metric("Data Points", "0", label_visibility="collapsed")
 
     st.markdown("#### 🛞 Tire Strategy")
-    st.markdown("Waiting for race data...")
+    st.markdown("Select a race session above to view tire strategy.")
 
     st.markdown("#### 📈 Position Changes")
-    st.markdown("Waiting for race data...")
+    st.markdown("Select a race session above to view position changes.")
 
     st.markdown("#### ⏱️ Lap Times")
-    st.markdown("Waiting for race data...")
+    st.markdown("Select a race session above to view lap times.")
