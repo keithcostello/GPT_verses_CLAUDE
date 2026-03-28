@@ -11,6 +11,7 @@ from strategy_tab import render_strategy_tab, render_mock_strategy
 from weather_tab import render_weather_tab, render_mock_weather
 from monte_carlo_tab import render_monte_carlo_tab, render_mock_monte_carlo
 import styles  # noqa: F401
+styles.apply_f1_dark_theme()
 
 # Page config
 st.set_page_config(
